@@ -81,3 +81,53 @@ jobs:
                 }
               ]
             }'
+
+  security-scan:
+    name: security-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        id: audit
+        run: |
+          npm audit --audit-level=high --json > audit-report.json 2>&1 || true
+
+      - name: Generate audit summary
+        run: |
+          echo "## Dependency Vulnerability Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -s audit-report.json ]; then
+            HIGH=$(node -e "const r=require('./audit-report.json'); const m=r.metadata||{}; const v=m.vulnerabilities||{}; console.log((v.high||0)+(v.critical||0))")
+            CRITICAL=$(node -e "const r=require('./audit-report.json'); const m=r.metadata||{}; const v=m.vulnerabilities||{}; console.log(v.critical||0)")
+            TOTAL=$(node -e "const r=require('./audit-report.json'); const m=r.metadata||{}; const v=m.vulnerabilities||{}; console.log(Object.values(v).reduce((a,b)=>a+b,0))")
+            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const r=require('./audit-report.json');
+              const v=(r.metadata||{}).vulnerabilities||{};
+              ['critical','high','moderate','low','info'].forEach(s=>{
+                if(v[s]!=null) console.log('| '+s+' | '+v[s]+' |');
+              });
+            " >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Total vulnerabilities:** $TOTAL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No vulnerabilities found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail on high or critical vulnerabilities
+        run: npm audit --audit-level=high
