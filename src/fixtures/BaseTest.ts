@@ -5,6 +5,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { InventoryPage } from '../pages/InventoryPage';
 import { NavigationComponent } from '../components/NavigationComponent';
 import { createLogger } from '../utils/logger';
+import { getStandardUser } from '../utils/envHelper';
 
 const logger = createLogger('BaseTest');
 
@@ -19,6 +20,11 @@ export interface AppFixtures {
   inventoryPage: InventoryPage;
   /** Pre-instantiated NavigationComponent bound to the current test's page. */
   nav: NavigationComponent;
+  /**
+   * Fixture that logs in as standard_user before the test body runs and
+   * resolves to the pre-authenticated InventoryPage instance.
+   */
+  authenticatedStandardUser: InventoryPage;
 }
 
 /**
@@ -48,6 +54,18 @@ export const test = base.extend<AppFixtures>({
 
   nav: async ({ page }, use) => {
     await use(new NavigationComponent(page));
+  },
+
+  authenticatedStandardUser: async ({ page }, use) => {
+    const loginPage = new LoginPage(page);
+    const inventoryPage = new InventoryPage(page);
+    const { username, password } = getStandardUser();
+
+    await loginPage.goto();
+    await loginPage.login(username, password);
+    await inventoryPage.waitForPageLoad();
+
+    await use(inventoryPage);
   },
 
   // ── Global setup / teardown hook via the built-in `page` fixture ───────────
