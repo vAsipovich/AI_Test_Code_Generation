@@ -9,7 +9,7 @@ test.describe('SauceDemo Login', () => {
   });
 
   test.describe('UI Elements', () => {
-    test('should display login form elements ', async ({ loginPage }) => {
+    test('should display login form elements', async ({ loginPage }) => {
       await expect(loginPage.getSwagLabsLogo()).toBeVisible();
       await expect(loginPage.getUsernameInput()).toBeVisible();
       await expect(loginPage.getPasswordInput()).toBeVisible();
