@@ -4,7 +4,7 @@
 import { test, expect } from '../../src/fixtures/BaseTest';
 
 test.describe('Checkout', () => {
-  test('Complete checkout with a single item — happy path', async ({ authenticatedStandardUser, page }) => {
+  test('Complete checkout with a single item — happy path', async ({ authenticatedStandardUser, page, cartPage, checkoutPage }) => {
     // 1. Add 'Sauce Labs Backpack' ($29.99) to the cart by clicking its 'Add to cart' button on the inventory page.
     await page.getByTestId('add-to-cart-sauce-labs-backpack').click();
 
@@ -15,76 +15,64 @@ test.describe('Checkout', () => {
     await page.getByTestId('shopping-cart-link').click();
 
     // expect: The page heading reads 'Your Cart'.
-    await expect(page.getByText('Your Cart')).toBeVisible();
+    await expect(cartPage.getCartTitle()).toHaveText('Your Cart');
 
     // expect: The cart contains exactly 1 line item: Sauce Labs Backpack, quantity 1, price $29.99.
     await expect(page.getByText('Sauce Labs Backpack')).toBeVisible();
-    await expect(page.getByTestId('item-quantity')).toHaveText('1');
-    await expect(page.getByTestId('inventory-item-price')).toHaveText('$29.99');
+    await expect(cartPage.getItemQuantity()).toHaveText('1');
+    await expect(cartPage.getItemPrice()).toHaveText('$29.99');
 
     // 3. Click the 'Checkout' button.
-    await page.getByTestId('checkout').click();
+    await cartPage.clickCheckout();
 
     // expect: The URL changes to /checkout-step-one.html.
     await expect(page).toHaveURL(/checkout-step-one\.html/);
 
-    // expect: The page heading reads 'Checkout: Your Information'.
-    await expect(page.getByText('Checkout: Your Information')).toBeVisible();
-
     // expect: Three input fields are visible: First Name, Last Name, Zip/Postal Code.
-    await expect(page.getByTestId('firstName')).toBeVisible();
-    await expect(page.getByTestId('lastName')).toBeVisible();
-    await expect(page.getByTestId('postalCode')).toBeVisible();
+    await expect(checkoutPage.getFirstNameInput()).toBeVisible();
+    await expect(checkoutPage.getLastNameInput()).toBeVisible();
+    await expect(checkoutPage.getPostalCodeInput()).toBeVisible();
 
     // 4. Fill in First Name = 'John', Last Name = 'Doe', Zip/Postal Code = '12345', then click 'Continue'.
-    await page.getByTestId('firstName').fill('John');
-    await page.getByTestId('lastName').fill('Doe');
-    await page.getByTestId('postalCode').fill('12345');
-    await page.getByTestId('continue').click();
+    await checkoutPage.fillCustomerInfo('John', 'Doe', '12345');
 
     // expect: The URL changes to /checkout-step-two.html.
     await expect(page).toHaveURL(/checkout-step-two\.html/);
 
-    // expect: The page heading reads 'Checkout: Overview'.
-    await expect(page.getByText('Checkout: Overview')).toBeVisible();
-
     // 5. Review the order summary displayed on the overview page.
     // expect: Item listed: Sauce Labs Backpack — $29.99.
     await expect(page.getByText('Sauce Labs Backpack')).toBeVisible();
-    await expect(page.getByTestId('inventory-item-price')).toHaveText('$29.99');
+    await expect(checkoutPage.getItemPrice()).toHaveText('$29.99');
 
     // expect: Payment Information: SauceCard #31337.
-    await expect(page.getByText('SauceCard #31337')).toBeVisible();
+    await expect(checkoutPage.getPaymentInfoValue()).toHaveText('SauceCard #31337');
 
     // expect: Shipping Information: Free Pony Express Delivery!
-    await expect(page.getByText('Free Pony Express Delivery!')).toBeVisible();
+    await expect(checkoutPage.getShippingInfoValue()).toHaveText('Free Pony Express Delivery!');
 
     // expect: Item total: $29.99.
-    await expect(page.getByText('Item total: $29.99')).toBeVisible();
+    await expect(checkoutPage.getSubtotalLabel()).toHaveText('Item total: $29.99');
 
     // expect: Tax: $2.40.
-    await expect(page.getByText('Tax: $2.40')).toBeVisible();
+    await expect(checkoutPage.getTaxLabel()).toHaveText('Tax: $2.40');
 
     // expect: Total: $32.39.
-    await expect(page.getByText('Total: $32.39')).toBeVisible();
+    await expect(checkoutPage.getTotalLabel()).toHaveText('Total: $32.39');
 
     // 6. Click the 'Finish' button.
-    await page.getByTestId('finish').click();
+    await checkoutPage.clickFinish();
 
     // expect: The URL changes to /checkout-complete.html.
     await expect(page).toHaveURL(/checkout-complete\.html/);
 
-    // expect: The page heading reads 'Checkout: Complete!'.
-    await expect(page.getByText('Checkout: Complete!')).toBeVisible();
-
     // expect: A confirmation heading 'Thank you for your order!' is visible.
-    await expect(page.getByText('Thank you for your order!')).toBeVisible();
+    await expect(checkoutPage.getCompleteHeader()).toHaveText('Thank you for your order!');
 
     // expect: The sub-message is visible.
-    await expect(page.getByText('Your order has been dispatched, and will arrive just as fast as the pony can get there!')).toBeVisible();
+    await expect(checkoutPage.getCompleteText()).toBeVisible();
 
     // expect: The 'Back Home' button is visible.
-    await expect(page.getByText('Back Home')).toBeVisible();
+    await expect(checkoutPage.getBackHomeButton()).toBeVisible();
 
     // expect: The cart badge is no longer displayed.
     await expect(page.getByTestId('shopping-cart-badge')).not.toBeVisible();

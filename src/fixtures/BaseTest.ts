@@ -3,6 +3,8 @@
 import { test as base, expect, TestInfo } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { InventoryPage } from '../pages/InventoryPage';
+import { CartPage } from '../pages/CartPage';
+import { CheckoutPage } from '../pages/CheckoutPage';
 import { NavigationComponent } from '../components/NavigationComponent';
 import { createLogger } from '../utils/logger';
 import { getStandardUser } from '../utils/envHelper';
@@ -18,6 +20,10 @@ export interface AppFixtures {
   loginPage: LoginPage;
   /** Pre-instantiated InventoryPage object bound to the current test's page. */
   inventoryPage: InventoryPage;
+  /** Pre-instantiated CartPage object bound to the current test's page. */
+  cartPage: CartPage;
+  /** Pre-instantiated CheckoutPage object bound to the current test's page. */
+  checkoutPage: CheckoutPage;
   /** Pre-instantiated NavigationComponent bound to the current test's page. */
   nav: NavigationComponent;
   /**
@@ -50,6 +56,14 @@ export const test = base.extend<AppFixtures>({
 
   inventoryPage: async ({ page }, use) => {
     await use(new InventoryPage(page));
+  },
+
+  cartPage: async ({ page }, use) => {
+    await use(new CartPage(page));
+  },
+
+  checkoutPage: async ({ page }, use) => {
+    await use(new CheckoutPage(page));
   },
 
   nav: async ({ page }, use) => {

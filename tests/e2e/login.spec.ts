@@ -25,20 +25,13 @@ test.describe('SauceDemo Login', () => {
   test.describe('Valid Login', () => {
     test('should login with standard user and redirect to inventory', async ({ loginPage, inventoryPage }) => {
       const { username, password } = getStandardUser();
-      
+
       await loginPage.login(username, password);
       await inventoryPage.waitForPageLoad();
-      
+
       await expect(inventoryPage.getPageTitle()).toBeVisible();
       expect(loginPage.getUrl()).toContain('/inventory.html');
-    });
 
-    test('should show products after successful login', async ({ loginPage, inventoryPage }) => {
-      const { username, password } = getStandardUser();
-      
-      await loginPage.login(username, password);
-      await inventoryPage.waitForPageLoad();
-      
       const productCount = await inventoryPage.getProductCount();
       expect(productCount).toBeGreaterThan(0);
     });
@@ -103,17 +96,11 @@ test.describe('SauceDemo Login', () => {
   });
 
   test.describe('Logout Flow', () => {
-    test('should logout successfully and return to login page', async ({ loginPage, inventoryPage }) => {
-      const { username, password } = getStandardUser();
-      
-      // Login first
-      await loginPage.login(username, password);
-      await inventoryPage.waitForPageLoad();
-      
+    test('should logout successfully and return to login page', async ({ authenticatedStandardUser, loginPage }) => {
       // Logout
-      await inventoryPage.logout();
+      await authenticatedStandardUser.logout();
       await loginPage.waitForPageLoad();
-      
+
       // Should be back on login page
       await expect(loginPage.getLoginForm()).toBeVisible();
       expect(loginPage.getUrl()).not.toContain('/inventory.html');

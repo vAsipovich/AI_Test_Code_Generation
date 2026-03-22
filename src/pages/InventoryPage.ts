@@ -34,7 +34,7 @@ export class InventoryPage extends BasePage {
 
   /** The "Products" page title. */
   getPageTitle(): Locator {
-    return this.page.locator('.title').filter({ hasText: 'Products' });
+    return this.page.getByTestId('title');
   }
 
   /** Shopping cart badge showing item count. */

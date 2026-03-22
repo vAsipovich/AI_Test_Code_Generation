@@ -36,7 +36,7 @@ export class LoginPage extends BasePage {
 
   /** The Swag Labs logo/heading. */
   getSwagLabsLogo(): Locator {
-    return this.page.locator('.login_logo');
+    return this.page.getByText('Swag Labs', { exact: true });
   }
 
   /** The username input field. */

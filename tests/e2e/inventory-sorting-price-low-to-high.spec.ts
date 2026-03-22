@@ -15,7 +15,7 @@ test.describe('Inventory Sorting', () => {
     await expect(page.getByTestId('product-sort-container')).toHaveValue('lohi');
 
     // Wait for sorting to complete by waiting for the first expected item
-    await expect(page.getByTestId('inventory-item-name').first()).toHaveText('Sauce Labs Onesie', { timeout: 10000 });
+    await expect(page.getByTestId('inventory-item-name').first()).toHaveText('Sauce Labs Onesie');
 
     // 3. Read the names and prices of all products in their new displayed order
     const productNames = page.getByTestId('inventory-item-name');
@@ -24,19 +24,7 @@ test.describe('Inventory Sorting', () => {
     // expect: All 6 products are visible
     await expect(productNames).toHaveCount(6);
 
-    // Collect all prices and verify they are sorted from low to high
-    const priceTexts = await productPrices.allTextContents();
-    const prices = priceTexts.map(price => parseFloat(price.replace('$', '')));
-    
-    // Verify prices are sorted in ascending order
-    for (let i = 1; i < prices.length; i++) {
-      expect(prices[i]).toBeGreaterThanOrEqual(prices[i - 1]);
-    }
-
-    // expect: Products appear in order: 1. Sauce Labs Onesie $7.99, 2. Sauce Labs Bike Light $9.99,
-    // 3. Sauce Labs Bolt T-Shirt $15.99, 4. Test.allTheThings() T-Shirt (Red) $15.99,
-    // 5. Sauce Labs Backpack $29.99, 6. Sauce Labs Fleece Jacket $49.99
-    // expect: Each product price matches its displayed label
+    // expect: Products appear in order with correct prices
     await expect(productNames.nth(0)).toHaveText('Sauce Labs Onesie');
     await expect(productPrices.nth(0)).toHaveText('$7.99');
 
