@@ -3,12 +3,14 @@ name: Playwright Tests
 on:
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 
 permissions:
   contents: read
 
 concurrency:
-  group: playwright-${{ github.event.pull_request.number }}
+  group: playwright-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -16,6 +18,13 @@ jobs:
     name: playwright-tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     env:
       CI: true
 
@@ -58,3 +67,128 @@ jobs:
         with:
           name: playwright-traces
           path: test-results/**/trace*.zip
+
+      - name: Notify Teams on failure
+        if: failure()
+        run: |
+          curl -s -X POST "${{ secrets.TEAMS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "@type": "MessageCard",
+              "@context": "https://schema.org/extensions",
+              "summary": "Playwright Tests Failed",
+              "themeColor": "FF0000",
+              "title": "Playwright Tests Failed",
+              "sections": [
+                {
+                  "facts": [
+                    { "name": "PR Title", "value": "${{ github.event.pull_request.title }}" },
+                    { "name": "Author", "value": "${{ github.event.pull_request.user.login }}" },
+                    { "name": "Branch", "value": "${{ github.head_ref }}" },
+                    { "name": "Workflow Run", "value": "[View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" }
+                  ]
+                }
+              ]
+            }'
+
+      # Merge previous run history from gh-pages branch into playwright-report/history.json
+      - name: Prepare history.json
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          HISTORY_FILE="playwright-report/history.json"
+          git fetch origin gh-pages 2>/dev/null || true
+          if git show origin/gh-pages:history.json > /tmp/prev-history.json 2>/dev/null; then
+            if jq -e 'type == "array"' /tmp/prev-history.json > /dev/null 2>&1; then
+              HISTORY=$(cat /tmp/prev-history.json)
+            else
+              HISTORY="[]"
+            fi
+          else
+            HISTORY="[]"
+          fi
+          PASSED=0
+          FAILED=0
+          if [ -f playwright-report/data/stats.json ]; then
+            PASSED=$(jq '.suites[0].stats.expected // 0' playwright-report/data/stats.json 2>/dev/null || echo 0)
+            FAILED=$(jq '.suites[0].stats.unexpected // 0' playwright-report/data/stats.json 2>/dev/null || echo 0)
+          fi
+          NEW_ENTRY=$(jq -n \
+            --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit_sha "${{ github.sha }}" \
+            --arg ref "${{ github.ref }}" \
+            --arg conclusion "${{ job.status }}" \
+            --argjson passed "$PASSED" \
+            --argjson failed "$FAILED" \
+            '{
+              timestamp: $timestamp,
+              run_url: $run_url,
+              commit_sha: $commit_sha,
+              ref: $ref,
+              conclusion: $conclusion,
+              counts: { passed: $passed, failed: $failed }
+            }')
+          echo "$HISTORY" | jq ". + [$NEW_ENTRY]" > "$HISTORY_FILE"
+
+      # Upload the HTML report directory as the GitHub Pages artifact
+      - name: Upload Pages artifact
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: playwright-report/
+
+      # Deploy the uploaded artifact to GitHub Pages
+      - name: Deploy to GitHub Pages
+        if: always() && github.ref == 'refs/heads/main'
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  security-scan:
+    name: security-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        id: audit
+        run: |
+          npm audit --audit-level=high --json > audit-report.json 2>&1 || true
+
+      - name: Generate audit summary
+        run: |
+          echo "## Dependency Vulnerability Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -s audit-report.json ]; then
+            HIGH=$(node -e "const r=require('./audit-report.json'); const m=r.metadata||{}; const v=m.vulnerabilities||{}; console.log((v.high||0)+(v.critical||0))")
+            CRITICAL=$(node -e "const r=require('./audit-report.json'); const m=r.metadata||{}; const v=m.vulnerabilities||{}; console.log(v.critical||0)")
+            TOTAL=$(node -e "const r=require('./audit-report.json'); const m=r.metadata||{}; const v=m.vulnerabilities||{}; console.log(Object.values(v).reduce((a,b)=>a+b,0))")
+            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const r=require('./audit-report.json');
+              const v=(r.metadata||{}).vulnerabilities||{};
+              ['critical','high','moderate','low','info'].forEach(s=>{
+                if(v[s]!=null) console.log('| '+s+' | '+v[s]+' |');
+              });
+            " >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Total vulnerabilities:** $TOTAL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No vulnerabilities found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail on high or critical vulnerabilities
+        run: npm audit --audit-level=high
