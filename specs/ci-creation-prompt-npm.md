@@ -1,7 +1,7 @@
 Create a GitHub Actions workflow at .github/workflows/playwright-tests.yml with the following exact requirements:
 
 Triggers
-Run only on pull requests targeting the main branch (pull_request with branches: [ ci ]).
+Run only on pull requests targeting the main branch (pull_request with branches: [ main ]).
 
 Runner & toolchain
 Use ubuntu-latest.
